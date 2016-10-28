@@ -1,0 +1,13 @@
+A small app to solve concordances for long-lasting queries.
+
+##The idea behind:
+Let's suppose we have uuid1 and uuid2 concorded.
+UUID1 - was picked as canonical - but it is not yet in our system.
+UUID2 - is already in our system, having a lot of relationships. The transfer would be too costly.
+Instead:
+renamed UUID2 node to UUID1, and add an Identifier for "UUID1".
+
+##Notice:
+- This only works, if only one of the nodes exists in db. (The code checks and ensures this.)
+- In case if there are more then 2 nodes, which need concordance, the app ensures that only one of them exists in the DB.
+
