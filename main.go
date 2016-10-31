@@ -19,6 +19,7 @@ func readUUIDS(path string) ([]string, error) {
 		return nil, err
 	}
 	uuids := strings.Split(string(content), "\n")
+	log.Printf("Uuids: %v", uuids)
 	return uuids, nil
 }
 
@@ -32,12 +33,9 @@ var httpClient = &http.Client{
 	},
 }
 
-func getCompositeOrgModel(baseURL string, authorization string, id string) (organisation, error) {
-
+func getCompositeOrgModel(baseURL string, id string) (organisation, error) {
 	req, _ := http.NewRequest("GET", baseURL+id, nil)
-	if authorization != "" {
-		req.Header.Set("Authorization", authorization)
-	}
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return organisation{}, fmt.Errorf("Could not get concept with uuid: %v (%v)", id, err)
@@ -57,7 +55,7 @@ func getCompositeOrgModel(baseURL string, authorization string, id string) (orga
 	if err != nil {
 		return organisation{}, fmt.Errorf("Could not get concept with uuid: %v (%v)", id, err)
 	}
-
+	log.Printf("Organisation found in the comp transformer: %v", org)
 	return org, nil
 }
 
@@ -88,15 +86,8 @@ func main() {
 		Desc:   "Composite org transformer",
 		EnvVar: "COMPOSITE_TRANSFORMER_URL",
 	})
-	auth := app.String(cli.StringOpt{
-		Name:   "auth",
-		Value:  "place you auth key here",
-		Desc:   "Authorisation for accessing composite org transformer",
-		EnvVar: "COCO_AUTHORIZATION",
-	})
-
 	app.Action = func() {
-		log.Printf("hey! %s | %d | %s | %s | %s", *neoURL, *batchSize, *uuidsPath, *transformerUrl, *auth)
+		log.Printf("Params! %s | %d | %s | %s | %s", *neoURL, *batchSize, *uuidsPath, *transformerUrl)
 
 		uuids, err := readUUIDS(*uuidsPath)
 		if err != nil {
@@ -110,27 +101,29 @@ func main() {
 		}
 
 		for _, uuid := range uuids {
-			log.Println("**** Starting updates for: ", uuid)
+			if len(uuid) > 5 {
+				log.Println("**** Starting updates for: ", uuid)
 
-			//make a call for the first uuid:
-			org, err := getCompositeOrgModel(*transformerUrl, *auth, uuid)
-			log.Println("     -> alternative uuids: ", org.AlternativeIdentifiers.UUIDS)
+				//make a call for the first uuid:
+				org, err := getCompositeOrgModel(*transformerUrl, uuid)
+				log.Println("     -> alternative uuids: ", org.AlternativeIdentifiers.UUIDS)
 
-			//execute queries
-			updated, err := updateOrganisation(db, org.UUID, org.AlternativeIdentifiers.UUIDS)
-			if err != nil {
-				log.Error(err)
-			}
+				//execute queries
+				updated, err := updateOrganisation(db, org.UUID, org.AlternativeIdentifiers.UUIDS)
+				if err != nil {
+					log.Error(err)
+				}
 
-			if updated {
-				log.Println("     The update was successful")
-			} else {
-				log.Println("     The update failed for %s", uuid)
+				if updated {
+					log.Println("     The update was successful")
+				} else {
+					log.Println("     The update failed for %s", uuid)
+				}
 			}
 		}
 	}
 
-	log.SetLevel(log.ErrorLevel)
+	log.SetLevel(log.InfoLevel)
 	log.Println("Application started with args %s", os.Args)
 
 	app.Run(os.Args)

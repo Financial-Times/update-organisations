@@ -13,45 +13,57 @@ func connectToNeo4J(batchSize int, neoURL string) (neoutils.NeoConnection, error
 	if err != nil {
 		log.Errorf("Could not connect to neo4j, error=[%s]\n", err)
 	}
-
+	log.Printf("Connected to NEO4J successfully")
 	return db, nil
 }
 
 func updateOrganisation(neoConn neoutils.NeoConnection, canonicalUUID string, uuids []string) (bool, error) {
 
-	//ensure that canonicalUUID does not exist, and has no relationships
+	// ensure that canonicalUUID does not exist, and has no relationships
+	// No UPPIdentifier exists for the canonical uuid (aka its V1)
 	canonicalNodeIsMissing, err := nodeIsMissing(canonicalUUID, neoConn)
 	if err != nil {
 		return false, err
 	}
-	if !canonicalNodeIsMissing {
-		return false, errors.New("canonical node exists: " + canonicalUUID)
-	}
 
-	//get a list of the non canonical uuids
-	for i, refUUID := range uuids {
-		if refUUID == canonicalUUID {
-			uuids = append(uuids[:i], uuids[i+1:]...)
-			break
+	if canonicalNodeIsMissing {
+		log.Info("Canonical Node is Missing (Are you only a V1 UUID): ", canonicalUUID)
+		// Find V2 Node
+		// get a list of the non canonical uuids
+		for i, refUUID := range uuids {
+			if refUUID == canonicalUUID {
+				uuids = append(uuids[:i], uuids[i+1:]...)
+				break
+			}
 		}
-	}
 
-	log.Info("not canonicalUUIDs: ", uuids)
+		log.Info("Not canonicalUUIDs: ", uuids)
 
-	// find the only existing node - ensure that there isn't more than one of them
-	existingUUID, err := findExistingNode(uuids, neoConn)
+		// find the only existing node - ensure that there isn't more than one of them
+		existingUUID, err := findExistingNode(uuids, neoConn)
 
-	if err != nil {
-		return false, err
-	}
+		if err != nil {
+			return false, err
+		}
 
-	// update org with setting canonical uuid
-	updateToCanonicalQuery(existingUUID, canonicalUUID, neoConn)
+		// Update UUID property
+		// update org with setting canonical uuid
+		updateToCanonicalQuery(existingUUID, canonicalUUID, neoConn)
 
-	// add to the existing org UPP identifiers for the other missing nodes
-	for _, refUUID := range uuids {
-		if refUUID != existingUUID {
-			addUPPIdentifierQuery(existingUUID, refUUID, neoConn)
+		// Ensure UPPidentifiers are present
+		// add to the existing org UPP identifiers for the other missing nodes
+		for _, refUUID := range uuids {
+			if refUUID != existingUUID {
+				addUPPIdentifierQuery(existingUUID, refUUID, neoConn)
+			}
+		}
+	} else {
+		log.Info("Canonical Node has been found (Are you only a V2 UUID): ", canonicalUUID)
+		for _, refUUID := range uuids {
+			if refUUID != canonicalUUID {
+				addUPPIdentifierQuery(canonicalUUID, refUUID, neoConn)
+			}
+
 		}
 	}
 
@@ -71,5 +83,6 @@ func findExistingNode(uuids []string, neoConn neoutils.NeoConnection) (string, e
 			existingNode = refUUID
 		}
 	}
+	log.Printf("Existing node: %v", existingNode)
 	return existingNode, nil
 }

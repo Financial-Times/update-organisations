@@ -13,7 +13,7 @@ func nodeIsMissing(uuid string, neoConn neoutils.NeoConnection) (bool, error) {
 
 	results := countResult{}
 	err := neoConn.CypherBatch([]*neoism.CypherQuery{{
-		Statement: `match (uppId:UPPIdentifier{value:{uuid}})-[:IDENTIFIES]->(a:Thing) return count(a) as c`,
+		Statement: `MATCH (uppId:UPPIdentifier{value:{uuid}})-[:IDENTIFIES]->(a:Thing) return count(a) as c`,
 		Parameters: map[string]interface{}{
 			"uuid": uuid,
 		},
@@ -47,8 +47,8 @@ func updateToCanonicalQuery(oldUUID string, canonicalUUID string, neoConn neouti
 
 func addUPPIdentifierQuery(oldUUID string, newUUID string, neoConn neoutils.NeoConnection) error {
 	return neoConn.CypherBatch([]*neoism.CypherQuery{{
-		Statement: `match (a:Organisation)<-[:IDENTIFIES]-(i:UPPIdentifier{value:{oldUUID}})
-		create (uppId:UPPIdentifier:Identifier{value:{newUUID}})-[i:IDENTIFIES]->(a)`,
+		Statement: `MATCH (a:Organisation)<-[:IDENTIFIES]-(i:UPPIdentifier{value:{oldUUID}})
+		MERGE (uppId:UPPIdentifier:Identifier{value:{newUUID}})-[ii:IDENTIFIES]->(a)`,
 		Parameters: map[string]interface{}{
 			"oldUUID": oldUUID,
 			"newUUID": newUUID,
